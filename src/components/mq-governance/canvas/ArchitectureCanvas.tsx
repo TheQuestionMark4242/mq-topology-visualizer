@@ -144,8 +144,12 @@ export default function ArchitectureCanvas({ data, topologyId, onDiagramReady }:
     data.appToQMEdges.forEach((e) => {
       linkArray.push({ from: e.app, to: e.qm });
     });
+    const chSeen = new Set<string>();
     data.channelEdges.forEach((ch) => {
-      linkArray.push({ from: ch.source, to: ch.target, label: ch.label, category: "channel" });
+      const pairKey = [ch.source, ch.target].sort().join("|");
+      const curv = chSeen.has(pairKey) ? -30 : 30;
+      chSeen.add(pairKey);
+      linkArray.push({ from: ch.source, to: ch.target, label: ch.label, category: "channel", curviness: curv });
     });
 
     const model = new go.GraphLinksModel(nodeArray, linkArray);
