@@ -1,44 +1,22 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as go from "gojs";
+import { sampleData } from "./mq-topology/sampleData";
+import {
+  createGroupTemplate,
+  createNodeTemplate,
+  createLinkTemplate,
+} from "./mq-topology/diagramTemplates";
+import Toolbar from "./mq-topology/Toolbar";
 
-const sampleData = {
-  nodeDataArray: [
-    // Queue Managers (groups)
-    { key: "QM1", text: "QM_PRODUCTION", isGroup: true, category: "queueManager" },
-    { key: "QM2", text: "QM_DEVELOPMENT", isGroup: true, category: "queueManager" },
-    { key: "QM3", text: "QM_GATEWAY", isGroup: true, category: "queueManager" },
-
-    // Queues inside QM1
-    { key: "Q1", text: "APP.REQUEST.Q", group: "QM1", category: "queue" },
-    { key: "Q2", text: "APP.REPLY.Q", group: "QM1", category: "queue" },
-    { key: "Q3", text: "DLQ.PRODUCTION", group: "QM1", category: "queue" },
-    { key: "Q4", text: "XMIT.QM_GATEWAY", group: "QM1", category: "queue", isTransmission: true },
-
-    // Queues inside QM2
-    { key: "Q5", text: "DEV.REQUEST.Q", group: "QM2", category: "queue" },
-    { key: "Q6", text: "DEV.REPLY.Q", group: "QM2", category: "queue" },
-    { key: "Q7", text: "DLQ.DEVELOPMENT", group: "QM2", category: "queue" },
-    { key: "Q8", text: "XMIT.QM_GATEWAY", group: "QM2", category: "queue", isTransmission: true },
-
-    // Queues inside QM3
-    { key: "Q9", text: "GW.INBOUND.Q", group: "QM3", category: "queue" },
-    { key: "Q10", text: "GW.OUTBOUND.Q", group: "QM3", category: "queue" },
-    { key: "Q11", text: "DLQ.GATEWAY", group: "QM3", category: "queue" },
-    { key: "Q12", text: "XMIT.QM_PROD", group: "QM3", category: "queue", isTransmission: true },
-    { key: "Q13", text: "XMIT.QM_DEV", group: "QM3", category: "queue", isTransmission: true },
-  ],
-  linkDataArray: [
-    // Channels between Queue Managers
-    { from: "QM1", to: "QM3", text: "QM1.TO.GW", category: "channel" },
-    { from: "QM3", to: "QM1", text: "GW.TO.QM1", category: "channel" },
-    { from: "QM2", to: "QM3", text: "QM2.TO.GW", category: "channel" },
-    { from: "QM3", to: "QM2", text: "GW.TO.QM2", category: "channel" },
-  ],
-};
+let nextQMId = 100;
+let nextQId = 200;
 
 export default function MQTopologyDiagram() {
   const diagramRef = useRef<HTMLDivElement>(null);
   const diagramInstance = useRef<go.Diagram | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [hasGroupSelected, setHasGroupSelected] = useState(false);
+  const [isLinkDrawing, setIsLinkDrawing] = useState(false);
 
   useEffect(() => {
     if (!diagramRef.current) return;
@@ -47,6 +25,7 @@ export default function MQTopologyDiagram() {
 
     const diagram = $(go.Diagram, diagramRef.current, {
       "undoManager.isEnabled": true,
+      "commandHandler.deletesTree": false,
       layout: $(go.LayeredDigraphLayout, {
         direction: 0,
         layerSpacing: 120,
@@ -55,119 +34,38 @@ export default function MQTopologyDiagram() {
       }),
       initialAutoScale: go.AutoScale.Uniform,
       padding: 40,
+      // Allow linking from groups (queue managers) only
+      "linkingTool.isEnabled": false,
+      "linkingTool.direction": go.LinkingDirection.ForwardsOnly,
+      "linkingTool.archetypeLinkData": { category: "channel", text: "NEW.CHANNEL" },
+      // Validate links: only between queue manager groups
+      "linkingTool.linkValidation": (
+        fromNode: go.GraphObject,
+        _fromPort: go.GraphObject,
+        toNode: go.GraphObject
+      ) => {
+        return (
+          fromNode instanceof go.Group &&
+          toNode instanceof go.Group &&
+          fromNode !== toNode
+        );
+      },
     });
 
-    // Queue Manager group template
-    diagram.groupTemplateMap.add(
-      "queueManager",
-      $(
-        go.Group,
-        "Auto",
-        {
-          layout: $(go.GridLayout, {
-            wrappingColumn: 2,
-            cellSize: new go.Size(1, 1),
-            spacing: new go.Size(8, 8),
-          }),
-          padding: new go.Margin(28, 12, 12, 12),
-          selectionAdornmentTemplate: $(
-            go.Adornment,
-            "Auto",
-            $(go.Shape, "RoundedRectangle", {
-              fill: null,
-              stroke: "hsl(211, 68%, 40%)",
-              strokeWidth: 2,
-            }),
-            $(go.Placeholder)
-          ),
-        },
-        $(go.Shape, "RoundedRectangle", {
-          parameter1: 6,
-          fill: "hsl(211, 60%, 95%)",
-          stroke: "hsl(211, 50%, 70%)",
-          strokeWidth: 2,
-        }),
-        $(
-          go.Panel,
-          "Vertical",
-          $(
-            go.Panel,
-            "Horizontal",
-            { alignment: go.Spot.TopLeft, margin: new go.Margin(6, 8, 4, 8) },
-            $(go.TextBlock, {
-              font: "bold 13px 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
-              stroke: "hsl(211, 68%, 30%)",
-              margin: new go.Margin(0, 0, 0, 4),
-            }, new go.Binding("text")),
-          ),
-          $(go.Placeholder, { padding: new go.Margin(4, 8, 8, 8) })
-        )
-      )
-    );
+    diagram.groupTemplateMap.add("queueManager", createGroupTemplate());
+    diagram.nodeTemplateMap.add("queue", createNodeTemplate());
+    diagram.linkTemplateMap.add("channel", createLinkTemplate());
 
-    // Queue node template
-    diagram.nodeTemplateMap.add(
-      "queue",
-      $(
-        go.Node,
-        "Auto",
-        { margin: new go.Margin(2, 2, 2, 2) },
-        $(go.Shape, "RoundedRectangle", {
-          parameter1: 4,
-          fill: "hsl(195, 55%, 92%)",
-          stroke: "hsl(195, 50%, 55%)",
-          strokeWidth: 1.5,
-          minSize: new go.Size(140, 32),
-        }, new go.Binding("fill", "isTransmission", (t) =>
-          t ? "hsl(40, 80%, 92%)" : "hsl(195, 55%, 92%)"
-        ), new go.Binding("stroke", "isTransmission", (t) =>
-          t ? "hsl(40, 60%, 55%)" : "hsl(195, 50%, 55%)"
-        )),
-        $(go.TextBlock, {
-          font: "11px 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
-          stroke: "hsl(215, 30%, 20%)",
-          margin: new go.Margin(6, 10, 6, 10),
-        }, new go.Binding("text"))
-      )
-    );
+    // Make groups linkable when link drawing is active
+    diagram.groupTemplateMap.get("queueManager")!.fromLinkable = false;
+    diagram.groupTemplateMap.get("queueManager")!.toLinkable = false;
 
-    // Channel link template
-    diagram.linkTemplateMap.add(
-      "channel",
-      $(
-        go.Link,
-        {
-          routing: go.Routing.AvoidsNodes,
-          corner: 12,
-          curve: go.Curve.JumpOver,
-        },
-        $(go.Shape, {
-          stroke: "hsl(211, 68%, 40%)",
-          strokeWidth: 2.5,
-        }),
-        $(go.Shape, {
-          toArrow: "Triangle",
-          fill: "hsl(211, 68%, 40%)",
-          stroke: null,
-          scale: 1.2,
-        }),
-        $(
-          go.Panel,
-          "Auto",
-          $(go.Shape, "RoundedRectangle", {
-            parameter1: 3,
-            fill: "hsl(0, 0%, 100%)",
-            stroke: "hsl(211, 50%, 70%)",
-            strokeWidth: 1,
-          }),
-          $(go.TextBlock, {
-            font: "10px 'JetBrains Mono', 'SF Mono', monospace",
-            stroke: "hsl(211, 68%, 30%)",
-            margin: new go.Margin(3, 6, 3, 6),
-          }, new go.Binding("text"))
-        )
-      )
-    );
+    // Track selection changes
+    diagram.addDiagramListener("ChangedSelection", () => {
+      const sel = diagram.selection;
+      setHasSelection(sel.count > 0);
+      setHasGroupSelected(sel.any((n) => n instanceof go.Group));
+    });
 
     diagram.model = new go.GraphLinksModel(
       sampleData.nodeDataArray,
@@ -181,6 +79,81 @@ export default function MQTopologyDiagram() {
     };
   }, []);
 
+  const addQueueManager = useCallback(() => {
+    const diagram = diagramInstance.current;
+    if (!diagram) return;
+    const id = `QM_NEW_${nextQMId++}`;
+    diagram.startTransaction("add QM");
+    diagram.model.addNodeData({
+      key: id,
+      text: "NEW_QM",
+      isGroup: true,
+      category: "queueManager",
+    });
+    diagram.commitTransaction("add QM");
+    // Select the new group
+    const newGroup = diagram.findNodeForKey(id);
+    if (newGroup) {
+      diagram.clearSelection();
+      newGroup.isSelected = true;
+    }
+  }, []);
+
+  const addQueue = useCallback(() => {
+    const diagram = diagramInstance.current;
+    if (!diagram) return;
+    const sel = diagram.selection.first();
+    const group = sel instanceof go.Group ? sel : sel?.containingGroup;
+    if (!group) return;
+    const id = `Q_NEW_${nextQId++}`;
+    diagram.startTransaction("add Queue");
+    diagram.model.addNodeData({
+      key: id,
+      text: "NEW.QUEUE",
+      group: group.key,
+      category: "queue",
+    });
+    diagram.commitTransaction("add Queue");
+  }, []);
+
+  const deleteSelected = useCallback(() => {
+    const diagram = diagramInstance.current;
+    if (!diagram) return;
+    diagram.startTransaction("delete");
+    diagram.commandHandler.deleteSelection();
+    diagram.commitTransaction("delete");
+  }, []);
+
+  const toggleLinkDrawing = useCallback(() => {
+    const diagram = diagramInstance.current;
+    if (!diagram) return;
+    const newVal = !isLinkDrawing;
+    setIsLinkDrawing(newVal);
+
+    diagram.startTransaction("toggle linking");
+    // Enable/disable the linking tool
+    diagram.toolManager.linkingTool.isEnabled = newVal;
+    // Make groups linkable or not
+    const tmpl = diagram.groupTemplateMap.get("queueManager");
+    if (tmpl) {
+      tmpl.fromLinkable = newVal;
+      tmpl.toLinkable = newVal;
+    }
+    // Update all existing groups
+    diagram.groups.each((g) => {
+      if (g.category === "queueManager") {
+        g.fromLinkable = newVal;
+        g.toLinkable = newVal;
+      }
+    });
+    diagram.commitTransaction("toggle linking");
+
+    // Change cursor
+    if (diagramRef.current) {
+      diagramRef.current.style.cursor = newVal ? "crosshair" : "";
+    }
+  }, [isLinkDrawing]);
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="border-b border-border bg-card px-6 py-4">
@@ -191,6 +164,16 @@ export default function MQTopologyDiagram() {
           Queue managers, queues, and communication channels
         </p>
       </header>
+
+      <Toolbar
+        onAddQueueManager={addQueueManager}
+        onAddQueue={addQueue}
+        onDelete={deleteSelected}
+        onToggleLinkDrawing={toggleLinkDrawing}
+        isLinkDrawing={isLinkDrawing}
+        hasSelection={hasSelection}
+        hasGroupSelected={hasGroupSelected}
+      />
 
       {/* Legend */}
       <div className="flex items-center gap-6 px-6 py-3 border-b border-border bg-card text-xs">
