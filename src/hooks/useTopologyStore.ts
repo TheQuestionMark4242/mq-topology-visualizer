@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { Topology } from "@/types/mq-topology";
+import type { Topology, FlowRow } from "@/types/mq-topology";
 import { sampleRows } from "@/data/sampleTopologyData";
 
 let nextId = 1;
@@ -19,8 +19,8 @@ export function useTopologyStore() {
 
   const activeTopology = topologies.find((t) => t.id === activeTopologyId) ?? topologies[0];
 
-  const addTopology = useCallback(() => {
-    const newTopo: Topology = { id: genId(), name: "New Topology", rows: [] };
+  const addTopology = useCallback((name?: string, rows?: FlowRow[]) => {
+    const newTopo: Topology = { id: genId(), name: name ?? "New Topology", rows: rows ?? [] };
     setTopologies((prev) => [...prev, newTopo]);
     setActiveTopologyId(newTopo.id);
   }, []);
