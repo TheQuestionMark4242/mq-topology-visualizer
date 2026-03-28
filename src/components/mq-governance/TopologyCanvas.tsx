@@ -1,9 +1,11 @@
-import { useState, useImperativeHandle, forwardRef, useCallback } from "react";
+import { useState, useImperativeHandle, forwardRef } from "react";
 import type { ViewType, NetworkGraph, DataFlowGraph, ArchitectureGraph } from "@/types/mq-topology";
 import ViewSwitcher from "./ViewSwitcher";
+import CanvasToolbar from "./CanvasToolbar";
 import NetworkCanvas from "./canvas/NetworkCanvas";
 import DataFlowCanvas from "./canvas/DataFlowCanvas";
 import ArchitectureCanvas from "./canvas/ArchitectureCanvas";
+import type * as go from "gojs";
 
 interface GraphData {
   network: NetworkGraph;
@@ -18,29 +20,35 @@ export interface TopologyCanvasHandle {
 
 interface TopologyCanvasProps {
   graphData: GraphData;
+  topologyId: string;
 }
 
 const TopologyCanvas = forwardRef<TopologyCanvasHandle, TopologyCanvasProps>(
-  ({ graphData }, ref) => {
+  ({ graphData, topologyId }, ref) => {
     const [activeView, setActiveView] = useState<ViewType>("network");
+    const [diagramRef, setDiagramRef] = useState<go.Diagram | null>(null);
 
-    // Stub imperative methods for future use
     useImperativeHandle(ref, () => ({
-      setGraphData: (_data: GraphData) => {
-        // Stub: will be used to push data imperatively
-      },
-      onGraphChange: (_callback: (data: GraphData) => void) => {
-        // Stub: will be used to subscribe to graph edits
-      },
+      setGraphData: (_data: GraphData) => {},
+      onGraphChange: (_callback: (data: GraphData) => void) => {},
     }), []);
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
         <ViewSwitcher activeView={activeView} onViewChange={setActiveView} />
-        <div className="flex-1 min-h-0">
-          {activeView === "network" && <NetworkCanvas data={graphData.network} />}
-          {activeView === "dataflow" && <DataFlowCanvas data={graphData.dataFlow} />}
-          {activeView === "architecture" && <ArchitectureCanvas data={graphData.architecture} />}
+        <CanvasToolbar diagram={diagramRef} activeView={activeView} />
+        <div className="flex-1 relative">
+          <div className="absolute inset-0">
+            {activeView === "network" && (
+              <NetworkCanvas data={graphData.network} topologyId={topologyId} onDiagramReady={setDiagramRef} />
+            )}
+            {activeView === "dataflow" && (
+              <DataFlowCanvas data={graphData.dataFlow} topologyId={topologyId} onDiagramReady={setDiagramRef} />
+            )}
+            {activeView === "architecture" && (
+              <ArchitectureCanvas data={graphData.architecture} topologyId={topologyId} onDiagramReady={setDiagramRef} />
+            )}
+          </div>
         </div>
       </div>
     );
