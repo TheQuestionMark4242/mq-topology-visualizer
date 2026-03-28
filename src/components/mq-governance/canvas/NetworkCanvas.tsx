@@ -50,7 +50,8 @@ export default function NetworkCanvas({ data, topologyId, onDiagramReady }: Netw
 
     diagram.linkTemplate = $(
       go.Link,
-      { routing: go.Routing.AvoidsNodes, corner: 10, curve: go.Curve.Bezier, curviness: 20 },
+      { routing: go.Routing.Normal, corner: 10, curve: go.Curve.Bezier },
+      new go.Binding("curviness", "curviness"),
       $(go.Shape, { stroke: "hsl(211, 68%, 40%)", strokeWidth: 2.5 }),
       $(go.Shape, { toArrow: "Triangle", fill: "hsl(211, 68%, 40%)", stroke: null, scale: 1.2 }),
       $(
@@ -78,7 +79,14 @@ export default function NetworkCanvas({ data, topologyId, onDiagramReady }: Netw
     if (!diagram) return;
 
     const nodeArray = data.nodes.map((n) => ({ key: n.id, label: n.label }));
-    const linkArray = data.edges.map((e) => ({ from: e.source, to: e.target, label: e.label }));
+    // Assign curviness so bidirectional links between the same pair curve apart
+    const seen = new Set<string>();
+    const linkArray = data.edges.map((e) => {
+      const pairKey = [e.source, e.target].sort().join("|");
+      const curv = seen.has(pairKey) ? -30 : 30;
+      seen.add(pairKey);
+      return { from: e.source, to: e.target, label: e.label, curviness: curv };
+    });
     diagram.model = new go.GraphLinksModel(nodeArray, linkArray);
   }, [data, topologyId]);
 
