@@ -8,8 +8,6 @@ import {
   sampleArchitectureGraph,
 } from "@/data/sampleTopologyData";
 
-// For now, all topologies use the same sample graph data.
-// In the future, each topology's rows will be derived into its own graph data.
 const sampleGraphData = {
   network: sampleNetworkGraph,
   dataFlow: sampleDataFlowGraph,
@@ -57,7 +55,12 @@ export default function Index() {
         onRemove={store.removeTopology}
       />
 
-      <TopologyCanvas ref={canvasRef} graphData={graphData} />
+      <TopologyCanvas
+        key={store.activeTopologyId}
+        ref={canvasRef}
+        graphData={graphData}
+        topologyId={store.activeTopologyId}
+      />
     </div>
   );
 }
