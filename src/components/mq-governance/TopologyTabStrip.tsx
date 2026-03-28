@@ -96,7 +96,7 @@ export default function TopologyTabStrip({
   onRemove,
 }: TopologyTabStripProps) {
   return (
-    <div className="flex items-end gap-1 px-4 pt-2 border-b border-border bg-muted/30">
+    <div className="flex items-end gap-1 px-4 pt-2">
       {topologies.map((t) => (
         <TabItem
           key={t.id}

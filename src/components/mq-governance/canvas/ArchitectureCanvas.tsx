@@ -100,7 +100,7 @@ export default function ArchitectureCanvas({ data, topologyId, onDiagramReady }:
       "channel",
       $(
         go.Link,
-        { routing: go.Routing.AvoidsNodes, corner: 12, curve: go.Curve.JumpOver },
+        { routing: go.Routing.AvoidsNodes, corner: 12, curve: go.Curve.Bezier, curviness: 20 },
         $(go.Shape, { stroke: "hsl(211, 68%, 40%)", strokeWidth: 2.5 }),
         $(go.Shape, { toArrow: "Triangle", fill: "hsl(211, 68%, 40%)", stroke: null, scale: 1.2 }),
         $(
