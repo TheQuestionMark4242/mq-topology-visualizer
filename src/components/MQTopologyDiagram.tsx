@@ -140,10 +140,10 @@ export default function MQTopologyDiagram() {
       tmpl.toLinkable = newVal;
     }
     // Update all existing groups
-    diagram.groups.each((g) => {
-      if (g.category === "queueManager") {
-        g.fromLinkable = newVal;
-        g.toLinkable = newVal;
+    diagram.nodes.each((n) => {
+      if (n instanceof go.Group && n.category === "queueManager") {
+        n.fromLinkable = newVal;
+        n.toLinkable = newVal;
       }
     });
     diagram.commitTransaction("toggle linking");
